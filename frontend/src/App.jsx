@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import "./styles.css";
 import HomePage from "./HomePage";
+import Dashboard from "./Dashboard";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState("home"); // "home" or "app"
+  const [currentPage, setCurrentPage] = useState("home"); // "home", "app", or "dashboard"
+  const [currentArtist, setCurrentArtist] = useState(null);
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState("verify");
   const [id, setId] = useState("");
@@ -36,6 +38,31 @@ export default function App() {
   };
 
   const handleBackToHome = () => {
+    setCurrentPage("home");
+    // Reset all form data
+    setFile(null);
+    setId("");
+    setPrivateKey("");
+    setPublicKey("");
+    setKeyPair(null);
+    setResult(null);
+    setAudioUrl(null);
+    setArtistName("");
+    setContactInfo("");
+    setDescription("");
+    setAuthToken("");
+    setChallenge("");
+    setIsAuthenticated(false);
+    setIsVerified(false);
+  };
+
+  const handleGoToDashboard = (artistId) => {
+    setCurrentArtist(artistId);
+    setCurrentPage("dashboard");
+  };
+
+  const handleLogout = () => {
+    setCurrentArtist(null);
     setCurrentPage("home");
     // Reset all form data
     setFile(null);
@@ -231,6 +258,10 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         setResult(`✅ Verified artist registered successfully! ID: ${data.artist_id}`);
+        // Auto-navigate to dashboard after successful registration
+        setTimeout(() => {
+          handleGoToDashboard(data.artist_id);
+        }, 2000);
       } else {
         const errorData = await response.json();
         setResult(`❌ Registration failed: ${errorData.error}`);
@@ -365,7 +396,7 @@ export default function App() {
     setAudioUrl(null);
   };
 
-  // Show home page or app based on currentPage state
+  // Show home page, dashboard, or app based on currentPage state
   if (currentPage === "home") {
     return (
       <HomePage 
@@ -375,17 +406,41 @@ export default function App() {
     );
   }
 
+  if (currentPage === "dashboard") {
+    return (
+      <Dashboard 
+        artistId={currentArtist}
+        onBackToHome={handleBackToHome}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <div className="app-header">
-        <button 
-          className="back-to-home-btn"
-          onClick={handleBackToHome}
-        >
-          ← Back to Home
-        </button>
-        <h1>🔐 Cryptographic Audio Authenticity</h1>
-        <p className="subtitle">Professional-grade watermarking with RSA key pairs</p>
+        <div className="header-left">
+          <button 
+            className="back-to-home-btn"
+            onClick={handleBackToHome}
+          >
+            ← Back to Home
+          </button>
+        </div>
+        <div className="header-center">
+          <h1>🔐 Cryptographic Audio Authenticity</h1>
+          <p className="subtitle">Professional-grade watermarking with RSA key pairs</p>
+        </div>
+        <div className="header-right">
+          {id && (
+            <button 
+              className="dashboard-btn"
+              onClick={() => handleGoToDashboard(id)}
+            >
+              📊 Dashboard
+            </button>
+          )}
+        </div>
       </div>
       
       <form onSubmit={handleSubmit} className="form">
