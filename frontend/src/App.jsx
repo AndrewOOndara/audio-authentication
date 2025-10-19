@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import "./styles.css";
+import HomePage from "./HomePage";
 
 export default function App() {
+  const [currentPage, setCurrentPage] = useState("home"); // "home" or "app"
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState("verify");
   const [id, setId] = useState("");
@@ -21,6 +23,36 @@ export default function App() {
   const [verificationMethod, setVerificationMethod] = useState("spotify");
   const [verificationData, setVerificationData] = useState("");
   const [isVerified, setIsVerified] = useState(false);
+
+  // Navigation functions
+  const handleGetStarted = () => {
+    setCurrentPage("app");
+    setMode("embed"); // Default to embed mode for new users
+  };
+
+  const handleVerifyTrack = () => {
+    setCurrentPage("app");
+    setMode("verify"); // Default to verify mode
+  };
+
+  const handleBackToHome = () => {
+    setCurrentPage("home");
+    // Reset all form data
+    setFile(null);
+    setId("");
+    setPrivateKey("");
+    setPublicKey("");
+    setKeyPair(null);
+    setResult(null);
+    setAudioUrl(null);
+    setArtistName("");
+    setContactInfo("");
+    setDescription("");
+    setAuthToken("");
+    setChallenge("");
+    setIsAuthenticated(false);
+    setIsVerified(false);
+  };
 
   const generateKeyPair = async () => {
     try {
@@ -333,10 +365,28 @@ export default function App() {
     setAudioUrl(null);
   };
 
+  // Show home page or app based on currentPage state
+  if (currentPage === "home") {
+    return (
+      <HomePage 
+        onGetStarted={handleGetStarted}
+        onVerifyTrack={handleVerifyTrack}
+      />
+    );
+  }
+
   return (
     <div className="app">
-      <h1>🔐 Cryptographic Audio Authenticity</h1>
-      <p className="subtitle">Professional-grade watermarking with RSA key pairs</p>
+      <div className="app-header">
+        <button 
+          className="back-to-home-btn"
+          onClick={handleBackToHome}
+        >
+          ← Back to Home
+        </button>
+        <h1>🔐 Cryptographic Audio Authenticity</h1>
+        <p className="subtitle">Professional-grade watermarking with RSA key pairs</p>
+      </div>
       
       <form onSubmit={handleSubmit} className="form">
         <div className="file-input-container">
