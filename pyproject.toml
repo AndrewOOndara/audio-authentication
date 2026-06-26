@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audioauth"
+version = "0.1.0"
+description = "Cryptographically signed audio watermarking using AudioSeal"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Andrew Ondara" }]
+dependencies = [
+    "audioseal>=0.1.4",
+    "cryptography>=42.0",
+    "numpy>=1.24",
+    "soundfile>=0.12",
+    "torch>=2.0",
+    "typer>=0.12",
+]
+
+[project.scripts]
+audioauth = "audioauth.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["audioauth*"]
