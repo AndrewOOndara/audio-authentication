@@ -1,204 +1,88 @@
-# Audio Authenticity MVP
+# audioauth
 
-[![GitHub](https://img.shields.io/github/license/AndrewOOndara/audio-authentication)](https://github.com/AndrewOOndara/audio-authentication)
-[![GitHub stars](https://img.shields.io/github/stars/AndrewOOndara/audio-authentication)](https://github.com/AndrewOOndara/audio-authentication)
-[![GitHub forks](https://img.shields.io/github/forks/AndrewOOndara/audio-authentication)](https://github.com/AndrewOOndara/audio-authentication)
+Cryptographically signed audio watermarking. Embeds an inaudible watermark in a track using Meta's [AudioSeal](https://arxiv.org/abs/2401.17264) and signs the result with the artist's RSA private key. Verifiers can prove who signed a given track by looking up the artist's public key in a local registry.
 
-A professional-grade audio watermarking system with cryptographic key pairs and external artist verification.
+## What it does
 
-🔗 **GitHub Repository**: https://github.com/AndrewOOndara/audio-authentication
+```
+sign      INPUT.wav + private key  →  signed.wav + .sig.json
+verify    signed.wav               →  artist name + confidence + ✓/✗
+```
 
-## Features
+The watermark survives typical attacks (resampling, MP3 compression, light noise) because it's neural; the RSA signature proves non-repudiation because only the artist holds the private key. Together they answer: *"is this audio genuinely from artist X?"*
 
-### 🔐 **Cryptographic Security**
-- **RSA 2048-bit key pairs** for maximum security
-- **Digital signatures** using industry-standard cryptography
-- **Non-repudiation** - artists can't deny creating watermarks
-- **Public/Private key separation** - private keys never shared
+## Install
 
-### 🎵 **Audio Watermarking**
-- Upload audio files (WAV format)
-- Embed inaudible watermarks with cryptographic signatures
-- Verify watermarks with digital signature validation
-- Download watermarked files with metadata
-- Professional-grade signal processing
-
-### 🔍 **External Artist Verification**
-- **Spotify Artist Verification** - Verify through Spotify profiles
-- **YouTube Channel Verification** - Verify through YouTube channels
-- **Social Media Verification** - Twitter/X and Instagram verification
-- **Manual Admin Verification** - Human oversight for edge cases
-- **Prevents AI Band Impersonation** - Only real artists can register
-
-### 🗄️ **Key Registry System**
-- **Centralized Public Key Management** - No manual key sharing needed
-- **Automatic Key Lookup** - Verifiers can lookup artist keys automatically
-- **Artist Registration** - Secure artist onboarding process
-- **Search & Discovery** - Find artists by name or ID
-
-### 🎨 **Modern UI**
-- **React Frontend** with Vite for fast development
-- **Dark Theme** with professional styling
-- **Responsive Design** - Works on desktop and mobile
-- **Real-time Feedback** - Live verification status updates
-
-## Tech Stack
-
-### **Backend**
-- **Python 3.8+** with FastAPI framework
-- **Audio Processing**: librosa, numpy, scipy, soundfile
-- **Cryptography**: cryptography library for RSA key pairs
-- **Security**: Digital signatures, authentication tokens
-- **Database**: JSON-based registry system
-
-### **Frontend**
-- **React 18** with Vite for fast development
-- **Modern CSS** with dark theme
-- **Responsive Design** with mobile support
-- **Real-time Updates** with loading states
-
-### **Security**
-- **RSA 2048-bit** cryptographic key pairs
-- **Digital Signatures** for non-repudiation
-- **External Platform Verification** for artist identity
-- **CORS Protection** for secure API access
-
-## Quick Start
-
-### Option 1: Start Both Servers (Recommended)
 ```bash
-./start_servers.sh
+pip install -e .
 ```
 
-### Option 2: Manual Setup
+Requires Python 3.10+. AudioSeal pulls in PyTorch; first run downloads the model weights (~100 MB).
 
-#### Backend Setup
-1. Navigate to the backend directory:
+## CLI
+
 ```bash
-cd backend
+# 1. Generate a keypair for an artist
+audioauth keygen --artist "Jane Doe" --out keys
+#   → keys/jane_doe.priv.pem, keys/jane_doe.pub.pem
+
+# 2. Register the public key locally
+audioauth register --artist "Jane Doe" --pubkey keys/jane_doe.pub.pem
+
+# 3. Sign a track
+audioauth sign song.wav --key keys/jane_doe.priv.pem -o song.signed.wav
+#   → song.signed.wav, song.signed.sig.json
+
+# 4. Verify
+audioauth verify song.signed.wav
+#   → VERIFIED — Jane Doe
+#     fingerprint: 7c1f9e3b...
+#     watermark confidence: 0.998
 ```
 
-2. Create and activate virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate
+## Library
+
+```python
+from pathlib import Path
+import audioauth
+
+audioauth.generate_keypair("keys", "jane_doe")
+registry = audioauth.Registry()
+registry.register("Jane Doe", audioauth.load_public_key_from_pem(
+    Path("keys/jane_doe.pub.pem").read_text()
+))
+
+audioauth.sign("song.wav", "song.signed.wav", "keys/jane_doe.priv.pem")
+
+result = audioauth.verify("song.signed.wav")
+print(result.verified, result.artist, result.watermark_confidence)
 ```
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+## How it works
 
-4. Start the server:
-```bash
-python main.py
-```
+1. **Watermark embed (AudioSeal).** Meta's pretrained model adds a tiny perturbation to the waveform that carries a 16-bit message. We use the first 16 bits of the artist's public-key fingerprint as the message, so the verifier can look up the right key from the audio alone.
+2. **Cryptographic signature (RSA-PSS/SHA-256).** The signer computes `SHA-256(watermarked_audio) || payload` and signs it with their RSA-2048 private key. The signature is stored in a sidecar `.sig.json` next to the audio.
+3. **Verify.** The verifier extracts the 16-bit watermark, looks up the matching artist in the registry, recomputes the audio hash, and checks the RSA signature.
 
-The backend will run on `http://localhost:8000`
+If the audio is re-encoded or lightly attacked, the AudioSeal watermark still recovers but the SHA-256 hash changes — at that point the sidecar fails closed, which is the correct behavior for tamper detection.
 
-#### Frontend Setup
-1. Navigate to the frontend directory:
-```bash
-cd frontend
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the development server:
-```bash
-npm run dev
-```
-
-The frontend will run on `http://localhost:5173`
-
-## Usage
-
-1. **Embed Watermark**:
-   - Select "Embed" mode
-   - Upload a WAV audio file
-   - Enter Artist ID and Secret Key
-   - Click Submit
-   - Download the watermarked file
-
-2. **Verify Watermark**:
-   - Select "Verify" mode
-   - Upload the watermarked file
-   - Enter the same Artist ID and Secret Key
-   - Click Submit
-   - View verification result and score
-
-## API Endpoints
-
-### **Core Watermarking**
-- `POST /embed` - Embed watermark (traditional method)
-- `POST /verify` - Verify watermark (traditional method)
-- `POST /embed-cryptographic` - Embed watermark with digital signature
-- `POST /verify-cryptographic` - Verify watermark with signature validation
-
-### **Key Management**
-- `POST /generate-keypair` - Generate RSA key pair
-- `POST /authenticate-artist` - Generate authentication challenge
-- `POST /verify-artist-signature` - Verify artist signature
-
-### **Artist Registry**
-- `POST /register-artist` - Register artist with public key
-- `GET /lookup-artist/{artist_id}` - Lookup artist's public key
-- `GET /list-artists` - List all registered artists
-- `GET /search-artists?q=query` - Search artists by name/ID
-- `POST /verify-with-registry` - Verify using registry lookup
-
-### **External Verification**
-- `GET /verification-methods` - Get available verification methods
-- `POST /verify-artist-identity` - Verify artist through external platform
-- `POST /register-verified-artist` - Register artist after verification
-
-### **System**
-- `GET /` - Health check
-- `GET /docs` - API documentation (Swagger UI)
-
-## Testing
-
-1. Upload a WAV file and embed a watermark
-2. Download the watermarked file
-3. Upload the watermarked file and verify it
-4. Try with different Artist ID/Secret Key combinations
-5. Test with unmarked files (should fail verification)
-
-## File Structure
+## Architecture
 
 ```
-audio-authentication/
-├── backend/
-│   ├── main.py                 # FastAPI server
-│   ├── requirements.txt        # Python dependencies
-│   └── watermark/
-│       ├── __init__.py
-│       ├── embed.py           # Watermark embedding logic
-│       ├── extract.py         # Watermark detection logic
-│       └── registry.json      # Optional registry
-└── frontend/
-    ├── index.html
-    ├── package.json
-    ├── vite.config.js
-    └── src/
-        ├── App.jsx            # Main React component
-        ├── main.jsx           # React entry point
-        └── styles.css         # Dark theme styling
+audioauth/
+├── watermark.py   # AudioSeal generator + detector wrapper
+├── crypto.py      # RSA-PSS keypair + sign/verify
+├── registry.py    # Local JSON-backed public-key directory
+├── workflow.py    # sign() / verify() orchestration
+├── io.py          # WAV load/save with 16 kHz resampling
+└── cli.py         # Typer command-line interface
 ```
 
-## Development
+## References
 
-Both servers support hot reloading:
-- Backend: `uvicorn main:app --reload`
-- Frontend: `npm run dev`
+- San Roman et al. *Proactive Detection of Voice Cloning with Localized Watermarking* (AudioSeal). 2024. <https://arxiv.org/abs/2401.17264>
+- AudioSeal pretrained models: <https://github.com/facebookresearch/audioseal>
 
-## Notes
+## License
 
-- Watermarks are inaudible (amplitude < 0.0005)
-- Uses SHA256-based reproducible random patterns
-- Correlation threshold: 0.01
-- Supports CORS for local development
-- Optimized for WAV files at 44.1kHz sample rate
+MIT
